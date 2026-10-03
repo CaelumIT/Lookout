@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lookout: search your data with local recommendations</title>
+<style>
+:root{
+  --bg:#E6ECF1; --panel:#F4F7F9; --card:#FFFFFF; --ink:#0F2233; --muted:#5A6B7B; --line:#CBD5DD;
+  --accent:#2F5BFF; --accent-soft:#E3EAFF; --accent-ink:#FFFFFF;
+  --ok:#1E8E5A; --bad:#C23B3B; --warn:#B7791F;
+  --sans:"Avenir Next","Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+  --serif:"Iowan Old Style","Charter","Palatino Linotype",Georgia,serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0C1823; --panel:#122130; --card:#172B3D; --ink:#E3ECF3; --muted:#8FA3B5; --line:#243A4E;
+    --accent:#7C98FF; --accent-soft:#1F3158; --accent-ink:#0C1823;
+    --ok:#4CC38A; --bad:#EF7C7C; --warn:#E3B04B;
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans);display:grid;grid-template-rows:auto 1fr}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* header */
+header{display:flex;gap:16px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{font:700 22px/1 var(--serif);letter-spacing:.01em;margin-right:4px}
+form.search{flex:1;display:flex;gap:8px;max-width:760px}
+form.search input{flex:1;min-width:0;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:15px}
+.btn{border:1px solid var(--line);background:var(--card);padding:8px 14px;border-radius:10px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.small{padding:4px 10px;font-size:12.5px;border-radius:8px}
+.spacer{flex:1}
+.status{display:flex;gap:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;font-size:12.5px;background:var(--card)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.pill[data-s=ok] .dot{background:var(--ok)} .pill[data-s=bad] .dot{background:var(--bad)}
+#histToggle{display:none}
+
+/* layout */
+main{display:grid;grid-template-columns:240px minmax(0,1fr) 390px;min-height:0}
+aside,section.results,section.ai{min-height:0;overflow:auto}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:14px 10px}
+section.results{padding:16px 20px}
+section.ai{background:var(--panel);border-left:1px solid var(--line);padding:16px 18px}
+h2{font:600 13px/1.2 var(--sans);color:var(--muted);margin:0 0 10px;display:flex;justify-content:space-between;align-items:center}
+
+/* history */
+#history{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+#history li{display:flex;align-items:center;border-radius:8px}
+#history li:hover{background:var(--accent-soft)}
+#history .h{flex:1;min-width:0;text-align:left;background:none;border:0;padding:7px 8px;display:grid}
+#history .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:550}
+#history .m{font-size:12px;color:var(--muted)}
+#history .x{background:none;border:0;color:var(--muted);padding:6px 8px;border-radius:6px;font-size:16px;line-height:1}
+#history .x:hover{color:var(--bad)}
+.empty-note{color:var(--muted);font-size:13px;padding:4px 8px}
+.linkbtn{background:none;border:0;color:var(--muted);padding:0;font-size:12.5px;text-decoration:underline}
+.linkbtn:hover{color:var(--accent)}
+
+/* results */
+.toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px}
+.count{color:var(--muted);margin-right:8px}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:3px 11px;font-size:12.5px}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.cards{display:grid;gap:10px}
+.card{--c:#5A6B7B;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--c);border-radius:10px}
+.card>.head{display:block;width:100%;text-align:left;background:none;border:0;padding:12px 14px}
+.type{font-size:12.5px;font-weight:600;color:var(--c)}
+.name{font:600 19px/1.25 var(--serif);margin:1px 0 2px;overflow-wrap:anywhere}
+.aliases{font-size:12.5px;color:var(--muted)}
+.desc{margin:6px 0 0;color:var(--ink);opacity:.88;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card.open .desc{-webkit-line-clamp:unset;white-space:pre-wrap}
+.meta{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:12.5px;color:var(--muted)}
+.meta b{color:var(--ink);font-weight:600}
+.tag{font-size:12px;background:var(--accent-soft);border-radius:6px;padding:0 7px}
+.pattern{font:12px/1.4 var(--mono);background:var(--bg);border-radius:6px;padding:6px 8px;margin-top:8px;overflow-x:auto;white-space:pre}
+.detail{display:none;padding:2px 14px 14px;border-top:1px solid var(--line)}
+.card.open .detail{display:block}
+.detail h3{font:600 12.5px/1.2 var(--sans);color:var(--muted);margin:12px 0 6px}
+.rel{display:flex;flex-wrap:wrap;gap:5px}
+.rel .chip{font-size:12.5px}
+.loading{color:var(--muted);padding:8px 0}
+
+/* empty / error */
+.hello{max-width:560px;margin:7vh auto 0}
+.hello h1{font:600 28px/1.2 var(--serif);margin:0 0 8px}
+.hello p{color:var(--muted);margin:0 0 14px}
+.examples{display:flex;flex-wrap:wrap;gap:6px}
+.error{background:color-mix(in srgb,var(--bad) 12%,var(--card));border:1px solid var(--bad);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.error code{font:12.5px var(--mono);overflow-wrap:anywhere}
+
+/* AI panel */
+.ai-box{border-left:3px solid var(--accent);padding-left:14px}
+.ai-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:12.5px;color:var(--muted)}
+.ai-tools label{display:inline-flex;gap:5px;align-items:center}
+.md h4{margin:14px 0 4px;font:600 15px/1.3 var(--serif)}
+.md h4:first-child{margin-top:0}
+.md p{margin:4px 0 8px}
+.md ul{margin:4px 0 8px;padding-left:20px}
+.md li{margin:3px 0}
+.md code{font:12.5px var(--mono);background:var(--bg);padding:1px 5px;border-radius:5px}
+.caret::after{content:"";display:inline-block;width:7px;height:14px;background:var(--accent);margin-left:3px;vertical-align:-2px;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.caret::after{animation:none}}
+.pivots{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.pivots .chip{border-color:var(--accent);color:var(--accent);background:transparent;margin:0 5px 6px 0;font-weight:550}
+.pivots .chip:hover{background:var(--accent-soft)}
+.fine{font-size:12px;color:var(--muted);margin-top:14px}
+
+/* search mode switch */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card);flex:none}
+.seg button{border:0;background:none;padding:8px 12px;font-size:13px}
+.seg button[aria-checked=true]{background:var(--ink);color:var(--bg);font-weight:600}
+.seg button:not([aria-checked=true]):hover{background:var(--accent-soft)}
+
+.srcsel{flex:none;max-width:170px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.srcsel[hidden]{display:none}
+
+.srcbadge{margin-left:8px;padding:0 7px;border-radius:6px;background:var(--bg);color:var(--muted);font-weight:500;font-size:11.5px}
+.evid{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg)}
+.evid dl{margin:0;display:grid;grid-template-columns:max-content 1fr;gap:2px 12px;font-size:12.5px}
+.evid dt{color:var(--muted)} .evid dd{margin:0;overflow-wrap:anywhere}
+.mono{font-family:var(--mono);font-size:11.5px}
+.aiwarn{margin:8px 0;font-size:12.5px;color:var(--warn)}
+.warn{color:var(--warn)}
+.verify{margin-top:8px}
+.excerpt{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.4 var(--mono);max-height:240px;overflow:auto;background:var(--card);padding:8px;border-radius:6px;margin:6px 0 0}
+/* contextual summary */
+.conn{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+.conn h3{font:600 12.5px/1.2 var(--sans);color:var(--muted);margin:12px 0 6px}
+.conn h3:first-child{margin-top:0}
+.conn ul{margin:0;padding-left:18px}
+.conn li{margin:2px 0}
+.conn .none{color:var(--muted)}
+
+/* intel bulletin */
+.bul-cta{margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+dialog#bulletin{width:min(900px,96vw);height:92vh;max-height:92vh;display:none;flex-direction:column}
+dialog#bulletin[open]{display:flex}
+#bulletin .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line)}
+#bulletin .bar b{font:600 16px var(--serif);flex:1}
+#bulletin .sheet{flex:1;overflow:auto;padding:28px 12px;background:var(--bg)}
+#bulletin .doc{max-width:720px;margin:0 auto;background:var(--card);border:1px solid var(--line);padding:36px 44px;font:15.5px/1.65 var(--serif)}
+.doc h1{font:700 26px/1.2 var(--serif);margin:0 0 12px}
+.doc h2{font:700 17px/1.3 var(--sans);margin:24px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.doc h3{font:600 15px/1.3 var(--sans);margin:16px 0 4px}
+.doc p{margin:6px 0 10px}
+.doc ul{padding-left:22px}
+.doc hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+@media (max-width:760px){#bulletin .doc{padding:20px 18px}}
+@media print{
+  body>*:not(#bulletin){display:none!important}
+  dialog#bulletin{position:static;width:auto;height:auto;max-height:none;border:0;display:block;background:#fff;color:#000}
+  #bulletin .bar{display:none}
+  #bulletin .sheet{overflow:visible;padding:0;background:#fff}
+  #bulletin .doc{border:0;padding:0;max-width:none;background:#fff;color:#000}
+}
+
+/* settings */
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);padding:0;width:min(520px,92vw)}
+dialog::backdrop{background:rgba(5,15,25,.5)}
+dialog form{padding:18px 20px;display:grid;gap:12px}
+dialog h3{font:600 20px var(--serif);margin:0}
+.field{display:grid;gap:4px}
+.field label{font-weight:600;font-size:13px}
+.field input,.field select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.field small{color:var(--muted)}
+.row{display:flex;gap:8px}
+.row>*:first-child{flex:1}
+.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+
+@media (max-width:1100px){
+  main{grid-template-columns:200px minmax(0,1fr)}
+  section.ai{grid-column:1 / -1;border-left:0;border-top:1px solid var(--line)}
+  body{height:auto;display:block} html{height:auto}
+  aside,section.results,section.ai{overflow:visible}
+}
+@media (max-width:760px){
+  header{flex-wrap:wrap}
+  form.search{order:3;flex-basis:100%;max-width:none}
+  #histToggle{display:inline-block}
+  main{grid-template-columns:1fr}
+  aside{display:none;border-right:0;border-bottom:1px solid var(--line)}
+  body.hist aside{display:block}
+  .status .lbl{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Lookout</div>
+  <form class="search" id="searchForm" autocomplete="off">
+    <select id="source" class="srcsel" aria-label="Data source" hidden></select>
+    <div class="seg" role="radiogroup" aria-label="Search mode">
+      <button type="button" role="radio" data-mode="simple" aria-checked="true" title="Match your text directly against OpenCTI">Simple</button>
+      <button type="button" role="radio" data-mode="contextual" aria-checked="false" title="Ask in plain English. The local model works out what to look up and how the entities connect">Contextual</button>
+    </div>
+    <label class="sr" for="q">Search</label>
+    <input id="q" type="search" placeholder="Search   (press / to focus)">
+    <button class="btn primary" type="submit">Search</button>
+  </form>
+  <button class="btn" id="histToggle" type="button">History</button>
+  <div class="status">
+    <span class="pill" id="pOcti" data-s="idle"><span class="dot"></span><span class="lbl" id="pSourceLbl">Source</span></span>
+    <span class="pill" id="pOllama" data-s="idle"><span class="dot"></span><span class="lbl">Ollama</span></span>
+  </div>
+  <button class="btn" id="openSettings" type="button">Model</button>
+</header>
+
+<main>
+  <aside aria-label="Search history">
+    <h2>History <button class="linkbtn" id="clearHist" type="button">Clear all</button></h2>
+    <ul id="history"></ul>
+  </aside>
+
+  <section class="results" aria-live="polite">
+    <div id="resultsHead"></div>
+    <div id="results"></div>
+  </section>
+
+  <section class="ai" aria-label="Recommendations">
+    <h2>Recommendations</h2>
+    <div class="ai-tools">
+      <span id="modelName"></span>
+      <label><input type="checkbox" id="auto"> Run after each search</label>
+      <button class="btn small" id="regen" type="button">Run again</button>
+      <button class="btn small" id="stop" type="button" hidden>Stop</button>
+    </div>
+    <div class="ai-box"><div id="aiBody" class="md"></div></div>
+    <div id="pivots" class="pivots" hidden></div>
+    <div class="bul-cta" id="bulCta" hidden>
+      <button class="btn primary" id="bulletinBtn" type="button">Expand into intel bulletin</button>
+      <span class="fine" style="margin:0">A longer write-up you can copy, download or print.</span>
+    </div>
+    <p class="fine" id="aiFine" hidden>Written by a local model from the results shown. Check the source records in OpenCTI before acting on any of it.</p>
+  </section>
+</main>
+
+<dialog id="settings">
+  <form method="dialog" id="settingsForm">
+    <h3>Model</h3>
+    <div class="field">
+      <label for="sModel">Ollama model</label>
+      <div class="row">
+        <select id="sModel"></select>
+        <button class="btn" type="button" id="refreshModels">Refresh list</button>
+      </div>
+      <small id="modelHint"></small>
+    </div>
+    <p class="fine" style="margin:0">Data sources, credentials and the Ollama address are set in <code>lookout.toml</code> on the machine running the server, so they never reach the browser.</p>
+    <div class="actions">
+      <button class="btn" value="cancel">Cancel</button>
+      <button class="btn primary" value="save" id="saveSettings">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="bulletin" aria-label="Intel bulletin">
+  <div class="bar">
+    <b>Intel bulletin</b>
+    <button class="btn small" id="bulCopy" type="button" disabled>Copy Markdown</button>
+    <button class="btn small" id="bulDownload" type="button" disabled>Download .md</button>
+    <button class="btn small" id="bulPrint" type="button" disabled>Print or save as PDF</button>
+    <button class="btn small" id="bulClose" type="button">Close</button>
+  </div>
+  <div class="sheet"><article class="md doc" id="bulBody"></article></div>
+</dialog>
+
+<script>
+"use strict";
+/* ---------- helpers ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clip = (s, n) => { s = String(s ?? "").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("lookout." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("lookout." + k, JSON.stringify(v)); } catch {} }
+};
+const settings = Object.assign({ model: "", auto: true, mode: "simple", source: "" }, store.get("settings", {}));
+const saveSettings = () => store.set("settings", settings);
+const state = { sources: [], term: "", results: [], total: 0, filter: "all", seq: 0, ai: null, aiText: "", related: new Map(),
+                focus: null, context: null, mode: "simple", ctrl: null, errors: {} };
+const currentSource = () => state.sources.find(s => s.id === settings.source) || state.sources[0] || null;
+
+/* ---------- server API ---------- */
+async function api(path, body, signal) {
+  const r = await fetch(path, { method: body === undefined ? "GET" : "POST", signal,
+    headers: body === undefined ? {} : { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const t = await r.text(); let j;
+  try { j = JSON.parse(t); } catch { throw new Error(`The server answered HTTP ${r.status}: ${clip(t, 200)}`); }
+  if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+/* Streaming endpoints return one JSON event per line. */
+async function stream(path, body, { signal, onEvent }) {
+  const r = await fetch(path, { method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) { const t = await r.text(); let m = t; try { m = JSON.parse(t).error || t; } catch {} throw new Error(m); }
+  const reader = r.body.getReader(), dec = new TextDecoder(); let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read(); if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1); if (!line) continue;
+      const ev = JSON.parse(line);
+      if (ev.error) throw new Error(ev.error);
+      onEvent(ev);
+    }
+  }
+}
+
+/* ---------- presentation helpers ---------- */
+function typeLabel(t = "") {
+  const s = t.replace(/-/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+const PALETTE = ["#C0392B", "#C26A12", "#7B4BB7", "#9A7B00", "#0F7C7A", "#2F5BFF", "#B0447A", "#3F7D3A"];
+function typeColor(t = "") {
+  const l = t.toLowerCase();
+  if (/intrusion|threat-actor|campaign/.test(l)) return PALETTE[0];
+  if (/malware|tool/.test(l)) return PALETTE[1];
+  if (/attack-pattern/.test(l)) return PALETTE[2];
+  if (/vulnerab/.test(l)) return PALETTE[3];
+  if (/indicator|addr|domain|url|file|hostname|email/.test(l)) return PALETTE[4];
+  if (/report|incident|infrastructure/.test(l)) return PALETTE[5];
+  let h = 0; for (const c of l) h = (h * 31 + c.charCodeAt(0)) >>> 0;     // any other type: stable colour from its name
+  return PALETTE[h % PALETTE.length];
+}
+function ago(ts) {
+  const s = (Date.now() - ts) / 1000;
+  if (s < 90) return "just now";
+  if (s < 5400) return Math.round(s / 60) + " min ago";
+  if (s < 129600) return Math.round(s / 3600) + " h ago";
+  return new Date(ts).toLocaleDateString();
+}
+
+/* ---------- history ---------- */
+let history = store.get("history", []);
+function addHistory(term, count, mode, source) {
+  history = history.filter(h => !(h.term.toLowerCase() === term.toLowerCase() && (h.mode || "simple") === mode && h.source === source));
+  history.unshift({ term, count, mode, source, ts: Date.now() });
+  history = history.slice(0, 60);
+  store.set("history", history); renderHistory();
+}
+function renderHistory() {
+  const ul = $("#history");
+  if (!history.length) { ul.innerHTML = '<li class="empty-note">Searches you run appear here.</li>'; return; }
+  const multi = state.sources.length > 1, name = id => state.sources.find(s => s.id === id)?.label || id;
+  ul.innerHTML = history.map((h, i) => `
+    <li><button class="h" type="button" data-term="${esc(h.term)}" data-mode="${esc(h.mode || "simple")}" data-source="${esc(h.source || "")}" title="Search again">
+      <span class="t">${esc(h.term)}</span><span class="m">${h.mode === "contextual" ? "Question, " : ""}${h.count} result${h.count === 1 ? "" : "s"}${multi && h.source ? ", " + esc(name(h.source)) : ""}, ${ago(h.ts)}</span></button>
+      <button class="x" type="button" data-del="${i}" aria-label="Remove ${esc(h.term)} from history">×</button></li>`).join("");
+}
+$("#history").addEventListener("click", e => {
+  const del = e.target.closest("[data-del]");
+  if (del) { history.splice(+del.dataset.del, 1); store.set("history", history); renderHistory(); return; }
+  const h = e.target.closest("[data-term]");
+  if (h) { document.body.classList.remove("hist"); runSearch(h.dataset.term, h.dataset.mode, h.dataset.source); }
+});
+$("#clearHist").addEventListener("click", () => { history = []; store.set("history", history); renderHistory(); });
+$("#histToggle").addEventListener("click", () => document.body.classList.toggle("hist"));
+
+/* ---------- sources ---------- */
+function renderSourceSelect() {
+  const sel = $("#source");
+  sel.innerHTML = state.sources.map(s => `<option value="${esc(s.id)}" title="${esc(s.description)}" ${s.id === settings.source ? "selected" : ""}>${esc(s.label)}</option>`).join("");
+  sel.hidden = state.sources.length < 2;
+  $("#pSourceLbl").textContent = clip(currentSource()?.label || "Source", 18);
+}
+function setSource(id, { keepView = false } = {}) {
+  if (!state.sources.some(s => s.id === id) || id === settings.source) return;
+  settings.source = id; saveSettings(); renderSourceSelect(); state.related.clear();
+  if (!keepView) { stopAI(); Object.assign(state, { term: "", results: [], context: null, focus: null }); resetAI(); renderHello(); renderHistory(); }
+  checkStatus();
+}
+$("#source").addEventListener("change", e => setSource(e.target.value));
+
+/* ---------- results ---------- */
+function renderHello() {
+  const src = currentSource(), ctx = settings.mode === "contextual";
+  const ex = (ctx ? src?.questions : src?.examples) || [];
+  $("#resultsHead").innerHTML = "";
+  $("#results").innerHTML = `<div class="hello"><h1>What do you want to look up?</h1>
+    <p>${ctx ? "Ask a question in plain English. Your local model works out what to look up and how the things you mention connect."
+             : "Search your data, then let your local model suggest what to read first and what to search next."}${src ? ` Searching <b>${esc(src.label)}</b>.` : ""}</p>
+    ${ex.length ? `<div class="examples">${ex.map(x => `<button class="chip" type="button" data-q="${esc(x)}">${esc(x)}</button>`).join("")}</div>` : ""}</div>`;
+}
+function renderError(msg, hint) {
+  $("#resultsHead").innerHTML = "";
+  $("#results").innerHTML = `<div class="error"><strong>Search failed.</strong><br><code>${esc(msg)}</code><br>${hint || ""}</div>`;
+}
+function renderResults() {
+  const types = {};
+  state.results.forEach(r => types[r.type] = (types[r.type] || 0) + 1);
+  const shown = state.results.map((r, i) => [r, i]).filter(([r]) => state.filter === "all" || r.type === state.filter);
+  const countText = state.context
+    ? `${state.results.length} record${state.results.length === 1 ? "" : "s"} found for your question`
+    : `${state.total.toLocaleString()} match${state.total === 1 ? "" : "es"} for <b>${esc(state.term)}</b>${state.total > state.results.length ? `, showing the top ${state.results.length}` : ""}`;
+  $("#resultsHead").innerHTML = errorsHtml() + connectionsHtml() + `<div class="toolbar"><span class="count">${countText}</span>
+    <button class="chip" type="button" data-filter="all" aria-pressed="${state.filter === "all"}">All</button>
+    ${Object.entries(types).map(([t, c]) => `<button class="chip" type="button" data-filter="${esc(t)}" aria-pressed="${state.filter === t}">${esc(typeLabel(t))} ${c}</button>`).join("")}</div>`;
+  if (!shown.length) {
+    $("#results").innerHTML = state.context
+      ? `<div class="hello"><h1>Nothing found for that question</h1><p>The source has no records for what was picked out of it. Try Simple search with an exact name or alias.</p></div>`
+      : `<div class="hello"><h1>No matches</h1><p>Nothing found for “${esc(state.term)}”. Try an alias, an identifier, or a shorter term.</p></div>`;
+    return;
+  }
+  $("#results").innerHTML = `<div class="cards">${shown.map(([r, i]) => card(r, i)).join("")}</div>`;
+}
+function card(r, i) {
+  const meta = r.meta.map(m => `<span>${esc(m.k)} <b>${esc(m.v)}</b></span>`);
+  if (r.date) meta.push(`<span>${esc(r.date_label || "Date")} <b>${esc(r.date)}</b></span>`);
+  r.labels.slice(0, 6).forEach(l => meta.push(`<span class="tag">${esc(l)}</span>`));
+  const aliases = r.aliases.filter(a => a !== r.name).slice(0, 8);
+  return `<article class="card" data-i="${i}" style="--c:${typeColor(r.type)}">
+    <button class="head" type="button" data-toggle aria-expanded="false">
+      <div class="type">${esc(typeLabel(r.type))}${state.sources.length > 1 && r.source_label ? `<span class="srcbadge">${esc(r.source_label)}</span>` : ""}</div>
+      <div class="name">${esc(r.name)}</div>
+      ${aliases.length ? `<div class="aliases">Also known as ${esc(aliases.join(", "))}</div>` : ""}
+      ${r.description ? `<p class="desc">${esc(r.description)}</p>` : ""}
+      ${r.code ? `<div class="pattern">${esc(clip(r.code, 300))}</div>` : ""}
+      <div class="meta">${meta.join("")}</div>
+    </button>
+    <div class="detail" id="d${i}"></div></article>`;
+}
+
+$("#results").addEventListener("click", e => {
+  const ex = e.target.closest("[data-q]"); if (ex) return runSearch(ex.dataset.q);
+  const pv = e.target.closest("[data-pivot]"); if (pv) return runSearch(pv.dataset.pivot);
+  const ask = e.target.closest("[data-ask]"); if (ask) return askAbout(+ask.dataset.ask);
+  const ver = e.target.closest("[data-verify]"); if (ver) return verifyEvidence(+ver.dataset.verify);
+  const head = e.target.closest("[data-toggle]"); if (!head) return;
+  const art = head.closest(".card"), i = +art.dataset.i, open = art.classList.toggle("open");
+  head.setAttribute("aria-expanded", open);
+  if (open && !$("#d" + i).dataset.loaded) loadDetail(i);
+});
+$("#resultsHead").addEventListener("click", e => {
+  const pv = e.target.closest("[data-pivot]"); if (pv) return runSearch(pv.dataset.pivot);
+  const f = e.target.closest("[data-filter]"); if (!f) return;
+  state.filter = f.dataset.filter; renderResults();
+});
+
+const srcOf = r => r.source || settings.source;
+const relKey = r => srcOf(r) + "|" + r.id;
+async function relatedFor(r) {
+  let items = state.related.get(relKey(r));
+  if (!items) { items = (await api("/api/related", { source: srcOf(r), id: r.id })).items; state.related.set(relKey(r), items); }
+  return items;
+}
+const fmtBytes = n => { n = Number(n); if (!isFinite(n)) return ""; const u = ["B", "KB", "MB", "GB", "TB"]; let i = 0; while (n >= 1024 && i < 4) { n /= 1024; i++; } return (i ? n.toFixed(1) : n) + " " + u[i]; };
+const iocTerm = o => { if (o.kind === "url") { try { return new URL(o.value).hostname; } catch {} } return o.value; };
+const iocChip = o => `<button class="chip" type="button" data-pivot="${esc(iocTerm(o))}" title="${esc(o.kind)}">${esc(o.value)}</button>`;
+function evidenceHtml(r, i) {
+  const e = r.evidence, canVerify = state.sources.find(s => s.id === srcOf(r))?.evidence;
+  const rows = [["Path", e.path], ["Size", e.size != null && e.size !== "" ? fmtBytes(e.size) : ""], ["Modified (per index)", e.modified], ["Indexed", e.indexed]].filter(x => x[1]);
+  return `<h3>Evidence</h3><div class="evid"><dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+    ${e.ai_derived?.length ? `<div class="aiwarn">Machine-generated text: ${e.ai_derived.map(x => `<span class="tag">${esc(x)}</span>`).join(" ")}. Treat it as a lead and check the original.</div>` : ""}
+    ${canVerify ? `<button class="btn small" type="button" data-verify="${i}">Verify file (SHA-256)</button><div class="verify" id="v${i}"></div>`
+                : `<div class="aliases" style="margin-top:6px">File access is not configured for this source, so the file cannot be hashed.</div>`}</div>`;
+}
+async function verifyEvidence(i) {
+  const r = state.results[i], out = $("#v" + i);
+  out.innerHTML = '<span class="loading">Reading and hashing the file…</span>';
+  try {
+    const j = await api("/api/evidence", { source: srcOf(r), id: r.id, hash: true, text: true }), f = j.facts;
+    out.innerHTML = `<dl><dt>SHA-256</dt><dd class="mono">${esc(f.sha256)}</dd><dt>File modified</dt><dd>${esc(f.modified)}</dd>
+      <dt>Size</dt><dd>${esc(fmtBytes(f.size))}${j.size_matches_index === false ? ' <b class="warn">differs from the index</b>' : ""}</dd>
+      <dt>Hashed</dt><dd>${esc(f.hashed_at)}${f.stable ? "" : ' <b class="warn">the file changed while being read</b>'}</dd></dl>
+      ${j.iocs?.length ? `<h3>Indicators in this file</h3><div class="rel">${j.iocs.map(iocChip).join("")}</div>` : ""}
+      ${j.text ? `<details><summary>File text${j.text.truncated ? " (first part)" : ""}</summary><pre class="excerpt">${esc(j.text.text)}</pre></details>` : ""}`;
+  } catch (err) { out.innerHTML = `<span class="loading">${esc(err.message)}</span>`; }
+}
+async function loadDetail(i) {
+  const r = state.results[i], box = $("#d" + i);
+  box.dataset.loaded = "1";
+  box.innerHTML = '<div class="loading">Loading…</div>';
+  const [rel, iocs] = await Promise.allSettled([relatedFor(r), api("/api/iocs", { record: r })]);
+  let html = r.evidence ? evidenceHtml(r, i) : "";
+  if (iocs.status === "fulfilled" && iocs.value.iocs.length)
+    html += `<h3>Indicators in this item</h3><div class="rel">${iocs.value.iocs.map(iocChip).join("")}</div>`;
+  if (rel.status === "fulfilled") {
+    const groups = {};
+    rel.value.forEach(it => (groups[it.type] ||= []).push(it));
+    html += Object.entries(groups).sort((a, b) => b[1].length - a[1].length).map(([t, arr]) => `
+      <h3>${esc(typeLabel(t))} (${arr.length})</h3>
+      <div class="rel">${arr.slice(0, 14).map(it => `<button class="chip" type="button" data-pivot="${esc(it.name)}" title="${esc(it.rel.replace(/-/g, " "))}, ${it.dir}">${esc(it.name)}${it.code ? " " + esc(it.code) : ""}</button>`).join("")}
+      ${arr.length > 14 ? `<span class="aliases">+${arr.length - 14} more in the source</span>` : ""}</div>`).join("");
+    if (!rel.value.length) html += `<div class="loading">${state.sources.find(s => s.id === srcOf(r))?.relationships ? "No relationships recorded for this item." : "This data source has no relationship data."}</div>`;
+  } else html += `<div class="loading">Could not load relationships: ${esc(rel.reason.message)}</div>`;
+  box.innerHTML = html + `<div style="margin-top:12px"><button class="btn small primary" type="button" data-ask="${i}">Get recommendations for this item</button></div>`;
+}
+
+function errorsHtml() {
+  const e = Object.entries(state.errors || {}); if (!e.length) return "";
+  const name = id => state.sources.find(s => s.id === id)?.label || id;
+  return `<div class="error" style="padding:8px 12px"><b>Some sources could not be searched.</b> ${e.map(([k, v]) => `${esc(name(k))}: ${esc(v)}`).join("; ")}</div>`;
+}
+
+/* ---------- contextual summary panel ---------- */
+function connectionsHtml() {
+  const c = state.context; if (!c) return "";
+  const where = r => c.federated && r.source_label ? `, ${esc(r.source_label)}` : "";
+  const looked = c.groups.map(g => `<li><b>${esc(g.asked)}</b> matched ${g.records.map(r => `${esc(r.name)} (${esc(typeLabel(r.type).toLowerCase())}${where(r)})`).join(" and ")}${g.exact ? "" : ", closest match only"}</li>`)
+    .concat(c.missing.map(m => `<li class="none">No record found for <b>${esc(m)}</b></li>`))
+    .concat(Object.keys(c.filters || {}).length ? [`<li>Filters applied: ${Object.entries(c.filters).map(([k, v]) => `${esc(k.replace(/_/g, " "))} = ${esc(v)}`).join(", ")}</li>`] : []).join("");
+  let h = `<div class="conn"><h3>Understood as</h3><ul>${looked}</ul>`;
+  if (c.groups.length > 1) {
+    if (!c.relationships) h += `<div class="none" style="margin-top:8px">${c.federated ? "None of these sources has" : "This data source has no"} relationship data, so links between these items cannot be assessed.</div>`;
+    else {
+      h += `<h3>Direct links</h3>` + (c.direct.length
+        ? `<ul>${c.direct.map(d => `<li><b>${esc(d.from)}</b> ${esc(d.relationship.replace(/-/g, " "))} <b>${esc(d.to)}</b></li>`).join("")}</ul>`
+        : `<div class="none">No direct relationship is recorded between them.</div>`);
+      h += `<h3>Shared connections (${c.shared.length})</h3>` + (c.shared.length
+        ? `<div class="rel">${c.shared.slice(0, 24).map(s => `<button class="chip" type="button" data-pivot="${esc(s.name)}" title="${esc(typeLabel(s.type) + ": " + Object.entries(s.via).map(([k, v]) => `${k} ${v.join(", ").replace(/-/g, " ")}`).join("; "))}">${esc(s.name)}</button>`).join("")}${c.shared.length > 24 ? `<span class="aliases">+${c.shared.length - 24} more</span>` : ""}</div>`
+        : `<div class="none">Nothing in common was found.</div>`);
+    }
+  }
+  if (c.pivots?.length) {
+    h += `<h3>Indicators that appear in other sources</h3><ul>${c.pivots.map(p => `<li>${iocChip(p.ioc)} from ${esc(p.group)}: also matches ${p.hits.map(x => `<b>${esc(x.name)}</b> (${esc(x.source_label || "source")})`).join(", ")}</li>`).join("")}</ul>
+      <div class="none">These are text matches on the indicator. They are leads, not proof of a relationship.</div>`;
+  }
+  return h + `</div>`;
+}
+
+/* ---------- search flow ---------- */
+const SUPERSEDED = "superseded";
+const progress = (id, msg) => { if (id === state.seq) $("#results").innerHTML = `<div class="loading">${esc(msg)}</div>`; };
+const stale = id => { if (id !== state.seq) throw new Error(SUPERSEDED); };
+
+async function runSearch(term, mode, sourceId) {
+  term = (term || "").trim(); if (!term || !currentSource()) return;
+  if (sourceId) setSource(sourceId, { keepView: true });
+  if (mode && mode !== settings.mode) setMode(mode);
+  mode = settings.mode;
+  const id = ++state.seq; stopAI();
+  if (state.ctrl) state.ctrl.abort();
+  const ctrl = state.ctrl = new AbortController();
+  $("#q").value = term;
+  Object.assign(state, { term, results: [], total: 0, filter: "all", focus: null, context: null, mode, errors: {} });
+  $("#resultsHead").innerHTML = "";
+  progress(id, mode === "contextual" ? "Reading your question…" : "Searching…");
+  resetAI();
+  const source = settings.source;
+  try {
+    if (mode === "contextual") {
+      if (!settings.model) throw Object.assign(new Error("Contextual search needs a model."), { hint: "Choose one with the Model button, or switch to Simple search." });
+      let ctx = null;
+      await stream("/api/contextual", { source, question: term, model: settings.model }, { signal: ctrl.signal,
+        onEvent: ev => { if (ev.progress) progress(id, ev.progress); if (ev.context) ctx = ev.context; } });
+      stale(id);
+      state.context = ctx; state.results = ctx.groups.flatMap(g => g.records); state.total = state.results.length;
+    } else {
+      const j = await api("/api/search", { source, term, limit: 30 }, ctrl.signal);
+      stale(id);
+      state.results = j.records; state.total = j.total; state.errors = j.errors || {};
+    }
+    renderResults(); addHistory(term, state.total, mode, source);
+    if (state.results.length && settings.auto) recommend();
+    else if (!state.results.length) $("#aiBody").innerHTML = "<p>Nothing to analyse yet.</p>";
+  } catch (err) {
+    if (id !== state.seq || err.name === "AbortError") return;
+    renderError(err.message, err.hint || "");
+    $("#aiBody").innerHTML = "";
+  }
+}
+
+/* ---------- AI panel ---------- */
+function askAbout(i) {
+  const r = state.results[i];
+  state.focus = { record: r, related: state.related.get(relKey(r)) || [] };
+  recommend();
+  $(".ai").scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+function resetAI() {
+  state.aiText = "";
+  $("#aiBody").innerHTML = ""; $("#pivots").hidden = true; $("#pivots").innerHTML = ""; $("#aiFine").hidden = true; $("#bulCta").hidden = true;
+  $("#stop").hidden = true;
+}
+function stopAI() { if (state.ai) { state.ai.abort(); state.ai = null; } $("#stop").hidden = true; }
+function splitAI(t) {
+  const re = /(?:^|\n)[#*\s]*suggested searches[\s:*#]*/i, m = t.match(re);
+  if (!m) return { body: t, pivots: [] };
+  const body = t.slice(0, m.index).replace(/[\s*#]+$/, "");
+  const pivots = t.slice(m.index + m[0].length).split("\n")
+    .map(l => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").replace(/[`*"“”]/g, "").trim())
+    .filter(l => l && l.length < 70 && !/^#/.test(l)).slice(0, 6);
+  return { body, pivots };
+}
+function md(t, doc = false) {
+  const inline = s => s.replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:]|$)/g, "$1<em>$2</em>");
+  let out = "", list = false, m;
+  for (const raw of esc(t).split("\n")) {
+    const l = raw.trimEnd();
+    if ((m = l.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/))) { if (!list) { out += "<ul>"; list = true; } out += `<li>${inline(m[1])}</li>`; continue; }
+    if (list) { out += "</ul>"; list = false; }
+    if (!l.trim()) continue;
+    if ((m = l.match(/^(#{1,6})\s+(.*)$/))) { const lv = doc ? Math.min(m[1].length, 3) : 4; out += `<h${lv}>${inline(m[2])}</h${lv}>`; }
+    else if (doc && /^-{3,}$/.test(l.trim())) out += "<hr>";
+    else out += `<p>${inline(l)}</p>`;
+  }
+  return out + (list ? "</ul>" : "");
+}
+function paintAI(done) {
+  const { body, pivots } = splitAI(state.aiText);
+  const el = $("#aiBody");
+  el.innerHTML = md(body);
+  el.classList.toggle("caret", !done);
+  const pv = $("#pivots");
+  if (done && pivots.length) {
+    pv.hidden = false;
+    pv.innerHTML = `<h2>Search next</h2>` + pivots.map(p => `<button class="chip" type="button" data-pivot="${esc(p)}">${esc(p)}</button>`).join("");
+  }
+  $("#aiFine").hidden = !done;
+  $("#bulCta").hidden = !(done && state.aiText.trim());
+}
+const genBody = kind => ({ kind, source: settings.source, model: settings.model, term: state.term, total: state.total,
+  records: state.results.slice(0, 30), context: state.context, focus: state.focus });
+
+async function recommend() {
+  $("#modelName").textContent = settings.model || "";
+  if (!state.results.length) return;
+  if (!settings.model) { $("#aiBody").innerHTML = "<p>Choose a model with the Model button to get recommendations.</p>"; return; }
+  stopAI(); resetAI();
+  const ctrl = new AbortController(); state.ai = ctrl;
+  $("#stop").hidden = false; $("#aiBody").classList.add("caret");
+  try {
+    await stream("/api/generate", genBody("recommend"), { signal: ctrl.signal, onEvent: ev => { if (ev.token) { state.aiText += ev.token; paintAI(false); } } });
+    paintAI(true);
+  } catch (err) {
+    if (err.name === "AbortError") { paintAI(true); return; }
+    $("#aiBody").classList.remove("caret");
+    $("#aiBody").innerHTML = `<div class="error"><strong>The model did not answer.</strong><br><code>${esc(err.message)}</code><br>
+      Make sure Ollama is running and that “${esc(settings.model)}” is installed (<code>ollama pull ${esc(settings.model)}</code>).</div>`;
+  } finally {
+    if (state.ai === ctrl) { state.ai = null; $("#stop").hidden = true; }
+  }
+}
+$("#regen").addEventListener("click", recommend);
+$("#stop").addEventListener("click", () => { stopAI(); paintAI(true); });
+$("#auto").addEventListener("change", e => { settings.auto = e.target.checked; saveSettings(); });
+$("#pivots").addEventListener("click", e => { const p = e.target.closest("[data-pivot]"); if (p) runSearch(p.dataset.pivot); });
+
+/* ---------- mode switch ---------- */
+function setMode(m) {
+  settings.mode = m; saveSettings();
+  document.querySelectorAll(".seg [data-mode]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.mode === m)));
+  $("#q").placeholder = m === "contextual" ? "Ask in plain English, e.g. how are these two things linked?" : "Search   (press / to focus)";
+  if (!state.term) renderHello();
+}
+document.querySelector(".seg").addEventListener("click", e => { const b = e.target.closest("[data-mode]"); if (b) setMode(b.dataset.mode); });
+
+/* ---------- intel bulletin ---------- */
+const bul = $("#bulletin"); let bulCtrl = null, bulText = "";
+const bulButtons = on => ["#bulCopy", "#bulDownload", "#bulPrint"].forEach(s => $(s).disabled = !on);
+async function openBulletin() {
+  if (!settings.model || !state.results.length) return;
+  if (bulCtrl) bulCtrl.abort();
+  const ctrl = bulCtrl = new AbortController(), body = $("#bulBody");
+  bulText = ""; bulButtons(false); body.classList.remove("caret");
+  body.innerHTML = '<p class="loading">Preparing the bulletin…</p>';
+  if (!bul.open) bul.showModal();
+  try {
+    await stream("/api/generate", genBody("bulletin"), { signal: ctrl.signal, onEvent: ev => {
+      if (ev.progress) body.innerHTML = `<p class="loading">${esc(ev.progress)}</p>`;
+      if (ev.token) { bulText += ev.token; body.classList.add("caret"); body.innerHTML = md(bulText, true); }
+    } });
+    body.classList.remove("caret"); bulButtons(true);
+  } catch (err) {
+    body.classList.remove("caret");
+    if (err.name === "AbortError") return;
+    body.innerHTML = `<div class="error"><strong>The bulletin could not be written.</strong><br><code>${esc(err.message)}</code></div>`;
+  }
+}
+const flash = (btn, txt) => { const o = btn.textContent; btn.textContent = txt; setTimeout(() => btn.textContent = o, 1400); };
+$("#bulletinBtn").addEventListener("click", openBulletin);
+$("#bulClose").addEventListener("click", () => bul.close());
+bul.addEventListener("close", () => { if (bulCtrl) bulCtrl.abort(); });
+$("#bulCopy").addEventListener("click", async e => { try { await navigator.clipboard.writeText(bulText); flash(e.target, "Copied"); } catch { flash(e.target, "Copy failed"); } });
+$("#bulDownload").addEventListener("click", () => {
+  const slug = state.term.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "bulletin";
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([bulText], { type: "text/markdown" }));
+  a.download = `bulletin-${slug}-${new Date().toISOString().slice(0, 10)}.md`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$("#bulPrint").addEventListener("click", () => window.print());
+
+/* ---------- model picker + status ---------- */
+const dlg = $("#settings");
+async function fillModels(preferred) {
+  const sel = $("#sModel"), hint = $("#modelHint");
+  hint.textContent = "Looking for installed models…";
+  try {
+    const names = (await api("/api/models")).models;
+    sel.innerHTML = names.map(n => `<option ${n === preferred ? "selected" : ""}>${esc(n)}</option>`).join("");
+    hint.textContent = names.length ? `${names.length} model${names.length === 1 ? "" : "s"} installed.` : "Ollama has no models yet. Run: ollama pull llama3.1";
+  } catch (e) {
+    sel.innerHTML = preferred ? `<option>${esc(preferred)}</option>` : "";
+    hint.textContent = "Could not list models: " + e.message;
+  }
+}
+$("#openSettings").addEventListener("click", () => { dlg.showModal(); fillModels(settings.model); });
+$("#refreshModels").addEventListener("click", () => fillModels($("#sModel").value));
+$("#settingsForm").addEventListener("submit", e => {
+  if (e.submitter?.value !== "save") return;
+  settings.model = $("#sModel").value || ""; saveSettings(); $("#modelName").textContent = settings.model; checkStatus();
+});
+function setPill(id, s, tip) { const p = $(id); p.dataset.s = s; p.title = tip; }
+function checkStatus() {
+  setPill("#pOcti", "idle", "Checking…"); setPill("#pOllama", "idle", "Checking…");
+  if (currentSource()) api("/api/test", { source: settings.source })
+    .then(j => setPill("#pOcti", "ok", j.message)).catch(e => setPill("#pOcti", "bad", e.message));
+  api("/api/models").then(j => {
+    setPill("#pOllama", "ok", `${j.models.length} model(s) installed`);
+    if (!settings.model && j.models.length) { settings.model = j.default_model || j.models[0]; saveSettings(); $("#modelName").textContent = settings.model; }
+  }).catch(e => setPill("#pOllama", "bad", e.message));
+}
+
+/* ---------- boot ---------- */
+$("#searchForm").addEventListener("submit", e => { e.preventDefault(); runSearch($("#q").value); });
+document.addEventListener("keydown", e => {
+  if (e.key === "/" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); $("#q").focus(); }
+});
+$("#auto").checked = settings.auto; $("#modelName").textContent = settings.model;
+(async function boot() {
+  try {
+    const j = await api("/api/sources");
+    state.sources = j.sources;
+    if (!settings.model && j.default_model) settings.model = j.default_model;
+    if (!state.sources.some(s => s.id === settings.source)) settings.source = state.sources[0]?.id || "";
+    saveSettings(); renderSourceSelect();
+  } catch (e) {
+    $("#results").innerHTML = `<div class="error"><strong>Cannot reach the Lookout server.</strong><br><code>${esc(e.message)}</code></div>`; return;
+  }
+  setMode(settings.mode); renderHistory(); renderHello(); checkStatus();
+})();
+</script>
+</body>
+</html>

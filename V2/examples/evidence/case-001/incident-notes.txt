@@ -1,0 +1,6 @@
+Case 001 working notes (SYNTHETIC sample for trying Lookout; not real data)
+
+The user reported a login prompt at 08:10. Outbound traffic to 203.0.113.50 on port 8443 was seen,
+and the workstation resolved evil-update[.]example[.]com shortly before. A scheduled task was created
+that launches PowerShell (T1059.001). Related advisory: CVE-2024-3400.
+File hash noted by the analyst: 44d88612fea8a8f36de82e1278abb02f

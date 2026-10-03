@@ -1,0 +1,22 @@
+opencti:
+  url: 'http://localhost:8080'
+  token: 'ChangeMe'
+
+connector:
+  id: 'ChangeMe'                 # a UUIDv4, unique per connector
+  type: 'INTERNAL_ENRICHMENT'
+  name: 'Lookout (local AI)'
+  scope: 'Intrusion-Set,Threat-Actor-Group,Threat-Actor-Individual,Malware,Tool,Campaign,Attack-Pattern,Vulnerability,Report,Incident,Case-Rfi'
+  auto: false                    # keep false: analysts trigger it from the Enrichment menu
+  log_level: 'info'
+
+lookout:
+  ollama_url: 'http://localhost:11434'
+  ollama_model: 'llama3.1:8b'
+  ollama_timeout: 600
+  num_ctx: 12288
+  output: 'bulletin'             # bulletin | summary
+  question_types: 'Case-Rfi'
+  max_tlp: 'TLP:RED'
+  link_found_entities: false
+  label: 'ai-generated'

@@ -1,0 +1,67 @@
+# A self-contained demo with synthetic data and no external services.
+# Run from the repository root:
+#   python3 examples/make_demo.py
+#   python3 web/server.py --config examples/lookout.demo.toml
+# Then pick "All sources" and ask: "What do we know about APT-Example?"
+# The sample files mention the actor's IP address and domain, so indicator pivots appear.
+# (Hash verification and file text work because the sample files live in examples/evidence/.)
+
+[server]
+port = 8765
+
+[ollama]
+url = "http://localhost:11434"
+# default_model = "llama3.1:8b"
+
+[[sources]]
+id = "intel"
+kind = "sqlite"
+label = "Demo intel"
+description = "Synthetic threat actors and their infrastructure"
+path = "examples/demo_intel.db"
+examples = ["APT-Example", "203.0.113.50"]
+questions = ["What do we know about APT-Example?"]
+
+  [[sources.entities]]
+  table = "actors"
+  type = "Intrusion-Set"
+  id = "id"
+  name = "name"
+  description = "about"
+  aliases = "aliases"
+  search = ["name", "aliases", "about"]
+
+  [[sources.relations]]
+  entity = "Intrusion-Set"
+  rel = "uses"
+  sql = "SELECT value AS name, kind AS type FROM infra WHERE actor_id = :id"
+
+[[sources]]
+id = "files"
+kind = "qsirch"
+label = "Demo files"
+description = "Sample file index (synthetic data in a development format, not the real Qsirch API)"
+backend = "fixture"
+fixture = "examples/qsirch_synthetic.json"
+examples = ["203.0.113.50", "whiteboard"]
+
+  [sources.mapping]
+  id = "id"
+  name = "filename"
+  path = "path"
+  size = "size"
+  modified = "modified"
+  indexed = "indexed"
+  taken = "taken"
+  category = "category"
+  snippet = "snippet"
+  tags = "tags"
+  people = "people"
+  objects = "objects"
+  places = "places"
+  ocr = "ocr"
+  summary = "summary"
+  transcript = "transcript"
+
+  [sources.content]                   # lets Lookout read and hash the files
+  path_map = [{ remote = "/share/Evidence", local = "examples/evidence" }]
