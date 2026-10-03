@@ -1,0 +1,31 @@
+# Add this service to your existing OpenCTI docker-compose.yml (same network as "opencti").
+# Put the Lookout repository next to it as ./lookout, then set in your .env:
+#   OPENCTI_VERSION=6.5.0                    (the version your platform runs)
+#   CONNECTOR_LOOKOUT_ID=<a new UUIDv4>
+#   CONNECTOR_LOOKOUT_TOKEN=<token of a dedicated, least-privilege connector user>
+services:
+  connector-lookout:
+    build:
+      context: ./lookout
+      dockerfile: connector/Dockerfile
+      args:
+        PYCTI_VERSION: ${OPENCTI_VERSION}
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${CONNECTOR_LOOKOUT_TOKEN}
+      - CONNECTOR_ID=${CONNECTOR_LOOKOUT_ID}
+      - CONNECTOR_TYPE=INTERNAL_ENRICHMENT
+      - CONNECTOR_NAME=Lookout (local AI)
+      - CONNECTOR_SCOPE=Intrusion-Set,Threat-Actor-Group,Threat-Actor-Individual,Malware,Tool,Campaign,Attack-Pattern,Vulnerability,Report,Incident,Case-Rfi
+      - CONNECTOR_AUTO=false
+      - CONNECTOR_LOG_LEVEL=info
+      - LOOKOUT_OLLAMA_URL=http://host.docker.internal:11434
+      - LOOKOUT_OLLAMA_MODEL=llama3.1:8b
+      - LOOKOUT_OUTPUT=bulletin
+      - LOOKOUT_MAX_TLP=TLP:RED
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      opencti:
+        condition: service_healthy
+    restart: always

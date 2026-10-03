@@ -1,0 +1,101 @@
+{
+ "_note": "SYNTHETIC sample data in a neutral shape invented for development. It is NOT the Qsirch API format; replace the mapping when the real reference is available.",
+ "capabilities": {
+  "keyword": true,
+  "ocr": true,
+  "semantic_images": true,
+  "ai_mode": false
+ },
+ "items": [
+  {
+   "id": "f1",
+   "filename": "incident-notes.txt",
+   "path": "/share/Evidence/case-001/incident-notes.txt",
+   "size": 414,
+   "modified": "2026-09-30T08:15:00Z",
+   "indexed": "2026-09-30T09:00:00Z",
+   "category": "document",
+   "snippet": "Outbound traffic to 203.0.113.50 on port 8443 ... evil-update.example.com ... CVE-2024-3400",
+   "tags": [
+    "case-001"
+   ],
+   "people": [],
+   "objects": [],
+   "places": [],
+   "ocr": null,
+   "summary": null,
+   "transcript": null
+  },
+  {
+   "id": "f2",
+   "filename": "mail-2026-09-30.eml",
+   "path": "/share/Evidence/case-001/mail-2026-09-30.eml",
+   "size": 253,
+   "modified": "2026-09-30T07:56:00Z",
+   "indexed": "2026-09-30T09:00:00Z",
+   "category": "email",
+   "snippet": "Urgent: password expires today. Sign in at evil-update.example.com/login",
+   "tags": [
+    "case-001",
+    "phishing"
+   ],
+   "people": [],
+   "objects": [],
+   "places": [],
+   "ocr": null,
+   "summary": null,
+   "transcript": null
+  },
+  {
+   "id": "f3",
+   "filename": "whiteboard.jpg",
+   "path": "/share/Evidence/case-001/whiteboard.jpg",
+   "size": 2481920,
+   "modified": "2026-09-29T16:40:00Z",
+   "indexed": "2026-09-29T17:10:00Z",
+   "taken": "2026-09-29T16:38:00Z",
+   "category": "photo",
+   "snippet": null,
+   "tags": [
+    "case-001",
+    "whiteboard"
+   ],
+   "people": [
+    "Alex"
+   ],
+   "objects": [
+    "whiteboard",
+    "diagram"
+   ],
+   "places": [
+    "Meeting room"
+   ],
+   "ocr": "C2 203.0.113.50:8443  beacon every 60s  host WS-114",
+   "summary": "A whiteboard with a hand-drawn network diagram and a list of addresses",
+   "transcript": null
+  },
+  {
+   "id": "f4",
+   "filename": "lobby-camera.mp4",
+   "path": "/share/Evidence/case-002/lobby-camera.mp4",
+   "size": 88123456,
+   "modified": "2026-09-28T22:01:00Z",
+   "indexed": "2026-09-29T01:00:00Z",
+   "category": "video",
+   "snippet": null,
+   "tags": [
+    "case-002"
+   ],
+   "people": [],
+   "objects": [
+    "door"
+   ],
+   "places": [
+    "Lobby"
+   ],
+   "ocr": null,
+   "summary": "A person enters the lobby after hours and uses a badge reader",
+   "transcript": "[00:12] door opens [00:20] badge reader beeps"
+  }
+ ]
+}

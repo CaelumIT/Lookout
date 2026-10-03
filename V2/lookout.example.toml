@@ -1,0 +1,140 @@
+# Lookout configuration. Copy to lookout.toml and edit.
+# Secrets can be written as "${ENV_VAR}"; they are read from the environment when the server starts.
+# Requires Python 3.11 or newer.
+
+[server]
+port = 8765
+
+[ollama]
+url = "http://localhost:11434"
+# default_model = "llama3.1:8b"      # used until someone picks a model in the UI
+timeout = 600
+
+# ---------------------------------------------------------------------------
+# 1. OpenCTI (threat intelligence platform; relationships come built in)
+# ---------------------------------------------------------------------------
+[[sources]]
+id = "opencti"
+kind = "opencti"
+label = "OpenCTI"
+url = "http://localhost:8080"
+token = "${OPENCTI_TOKEN}"            # use a read-only user
+# verify_tls = false                  # only for a self-signed certificate
+
+# ---------------------------------------------------------------------------
+# 2. Elasticsearch or OpenSearch (documents such as logs and events)
+#    Documents have no built-in relationships. "pivots" lists the fields whose values count as
+#    related things (hosts, users, IPs). Clicking one searches for it, which finds other documents.
+# ---------------------------------------------------------------------------
+[[sources]]
+id = "logs"
+kind = "elasticsearch"                # or "opensearch"
+label = "Security logs"
+description = "Authentication and endpoint events from our SIEM"
+url = "https://es.example.internal:9200"
+index = "logs-*"
+api_key = "${ES_API_KEY}"             # or: username = "..." and password = "${ES_PASSWORD}"
+# ca_file = "/etc/ssl/certs/internal-ca.pem"
+# verify_tls = false
+
+  [sources.mapping]                   # dotted paths into each document
+  name = "message"
+  description = "event.reason"
+  date = "@timestamp"
+  type = "event.category"             # or: type_value = "Log event"
+  search_fields = ["message^3", "host.name", "user.name", "source.ip"]
+  meta = { Action = "event.action", Host = "host.name", Outcome = "event.outcome" }
+  pivots = { Host = "host.name", User = "user.name", IP = "source.ip" }
+
+# ---------------------------------------------------------------------------
+# 3. MySQL or MariaDB (needs: pip install pymysql). PostgreSQL works the same with kind = "postgres"
+#    (needs: pip install "psycopg[binary]"). Use an account that can only SELECT.
+# ---------------------------------------------------------------------------
+[[sources]]
+id = "incidents"
+kind = "mariadb"                      # mysql | mariadb | postgres
+label = "Incident database"
+description = "Security incidents and the assets they affected"
+host = "db.example.internal"
+port = 3306
+user = "lookout_ro"
+password = "${INCIDENTS_DB_PASSWORD}"
+database = "secops"
+max_rows = 100
+examples = ["ransomware", "phishing"]
+questions = ["Which incidents affected the same assets?"]
+
+  # One block per table to search. Column names are checked at start-up, and values are always
+  # passed to the database as parameters, never pasted into the SQL.
+  [[sources.entities]]
+  table = "incidents"
+  type = "Incident"
+  id = "id"
+  name = "title"
+  description = "summary"
+  aliases = "aliases"                 # optional; ';' ',' or '|' separated text
+  labels = "tags"                     # optional; same format
+  date = "created_at"
+  search = ["title", "summary", "notes"]
+  # search_mode = "fulltext"          # MySQL/MariaDB only; needs a FULLTEXT index on the columns above
+  meta = { Status = "status", Severity = "severity" }
+
+  [[sources.entities]]
+  table = "assets"
+  type = "Asset"
+  id = "id"
+  name = "hostname"
+  description = "owner"
+
+  # Relationships are SELECT statements you write. :id is the key of the record being expanded.
+  # Return a "name" column; optional columns: type, rel, dir ("outbound"/"inbound"), code.
+  [[sources.relations]]
+  entity = "Incident"                 # applies to records of this type
+  rel = "affected"
+  type = "Asset"
+  sql = """
+    SELECT a.hostname AS name
+    FROM incident_assets ia JOIN assets a ON a.id = ia.asset_id
+    WHERE ia.incident_id = :id
+  """
+
+  [[sources.relations]]
+  entity = "Asset"
+  rel = "was affected by"
+  type = "Incident"
+  sql = """
+    SELECT i.title AS name
+    FROM incident_assets ia JOIN incidents i ON i.id = ia.incident_id
+    WHERE ia.asset_id = :id
+  """
+
+# ---------------------------------------------------------------------------
+# 4. QNAP Qsirch (files on a NAS). WORK IN PROGRESS: the real HTTP backend is waiting for the API
+#    reference served by your NAS at http://<NAS>:<port>/qsirch/latest/api. Until then, try the
+#    sample-data setup in examples/lookout.demo.toml. See docs/QSIRCH.md.
+# ---------------------------------------------------------------------------
+# [[sources]]
+# id = "nas"
+# kind = "qsirch"
+# label = "NAS files"
+# backend = "http"                     # "fixture" uses sample data from the 'fixture' file instead
+# url = "https://nas.example.internal:443"
+# username = "lookout_ro"              # a dedicated, read-only NAS user
+# password = "${NAS_PASSWORD}"
+#   [sources.mapping]                  # field names are filled in once the API reference is known
+#   [sources.content]                  # optional: mount the share locally to hash files and read their text
+#   path_map = [{ remote = "/share/Evidence", local = "/mnt/nas/Evidence" }]
+
+# ---------------------------------------------------------------------------
+# 5. SQLite (handy for trying Lookout out; always opened read-only)
+# ---------------------------------------------------------------------------
+# [[sources]]
+# id = "local"
+# kind = "sqlite"
+# label = "Local database"
+# path = "/path/to/file.db"
+#   [[sources.entities]]
+#   table = "notes"
+#   id = "id"
+#   name = "title"
+#   search = ["title", "body"]
